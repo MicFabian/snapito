@@ -328,6 +328,21 @@ void booksAPayment(String currency, int amount) {
 writes `books-a-payment-currency-eur.json` and `books-a-payment-currency-usd.json`. Without a value, every parameter
 becomes part of the key.
 
+## Getting the compared value back
+
+`Snapito.snapshot(...)` does everything `expect(...)` does — it fails on a mismatch with the same diff, review
+artifacts, and update hint — and additionally returns the compared value:
+
+```java
+var reviewed = Snapito.snapshot(service.fetch());
+```
+
+On the first run it returns the value it just recorded; afterwards it returns the reviewed baseline, which is the
+same value the assertion just passed against. A mismatch throws rather than quietly handing back the stale baseline.
+
+`snapshotNamed(...)` is the named form. `updateSnapshot(...)` and `updateSnapshotNamed(...)` rewrite the baseline
+instead of comparing against it, and return the newly written value.
+
 ## Multiple snapshots per test
 
 ```java

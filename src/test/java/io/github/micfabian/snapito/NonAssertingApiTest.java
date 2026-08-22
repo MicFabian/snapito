@@ -79,15 +79,56 @@ class NonAssertingApiTest {
   }
 
   @Test
-  void returnsTheStoredBaselineOnMismatchAndLeavesItUntouched() {
+  void failsOnMismatchAndShowsTheDiscrepancy() {
     Snapito.snapshotNamed("drift", Map.of("amount", 42));
     SnapitoTestSupport.enterTest("LedgerServiceTest", "buildsALedger");
 
-    Object returned = Snapito.snapshotNamed("drift", Map.of("amount", 43));
+    AssertionFailedError error = assertThrows(AssertionFailedError.class,
+      () -> Snapito.snapshotNamed("drift", Map.of("amount", 43)));
 
-    assertEquals(Map.of("amount", java.math.BigDecimal.valueOf(42)), returned,
-      "snapshot() reports the reviewed baseline rather than the drifting value");
-    assertTrue(SnapitoTestSupport.read(snapshot("drift.json")).contains("42"));
+    assertTrue(error.getMessage().contains("Snapshot mismatch"));
+    assertTrue(error.getMessage().contains("$.amount expected 42, but was 43"),
+      "The failure must name the differing value, not just report that something changed");
+    assertEquals("42", String.valueOf(error.getExpected().getValue()).replaceAll("\\D", ""));
+    assertEquals("43", String.valueOf(error.getActual().getValue()).replaceAll("\\D", ""));
+  }
+
+  @Test
+  void keepsTheReviewedBaselineAndWritesReviewArtifactsOnMismatch() {
+    Snapito.snapshotNamed("artifacts", Map.of("amount", 42));
+    SnapitoTestSupport.enterTest("LedgerServiceTest", "buildsALedger");
+
+    assertThrows(AssertionFailedError.class, () -> Snapito.snapshotNamed("artifacts", Map.of("amount", 43)));
+
+    assertTrue(SnapitoTestSupport.read(snapshot("artifacts.json")).contains("42"),
+      "A mismatch must never overwrite the reviewed baseline");
+    assertTrue(Files.exists(snapshot("artifacts.json.actual")));
+    assertTrue(Files.exists(snapshot("artifacts.json.diff.txt")));
+  }
+
+  @Test
+  void suggestsHowToUpdateWhenASnapshotMismatches() {
+    Snapito.snapshotNamed("hint", Map.of("amount", 42));
+    SnapitoTestSupport.enterTest("LedgerServiceTest", "buildsALedger");
+
+    AssertionFailedError error = assertThrows(AssertionFailedError.class,
+      () -> Snapito.snapshotNamed("hint", Map.of("amount", 43)));
+
+    assertTrue(error.getMessage().contains("snapito.snapshot.update=true"));
+  }
+
+  @Test
+  void failsWhenAnUpdateIsRequestedButTheSnapshotIsOutOfScope() {
+    Snapito.snapshotNamed("scoped", Map.of("amount", 42));
+    System.setProperty("snapito.snapshot.update", "true");
+    Snapito.configure(config -> config.setUpdateOnly(List.of("something-else-*")));
+    SnapitoTestSupport.enterTest("LedgerServiceTest", "buildsALedger");
+
+    AssertionFailedError error = assertThrows(AssertionFailedError.class,
+      () -> Snapito.snapshotNamed("scoped", Map.of("amount", 43)));
+
+    assertTrue(error.getMessage().contains("Snapshot excluded by snapito.updateOnly"));
+    assertTrue(SnapitoTestSupport.read(snapshot("scoped.json")).contains("42"));
   }
 
   @Test
