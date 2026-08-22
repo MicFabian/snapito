@@ -1,0 +1,160 @@
+plugins {
+  id 'java-library'
+  id 'jacoco'
+  id 'maven-publish'
+  id 'signing'
+  id 'io.github.gradle-nexus.publish-plugin' version '2.0.0'
+}
+
+group = 'io.github.micfabian'
+def defaultVersion = '1.0.0'
+version = (findProperty('releaseVersion') ?: System.getenv('RELEASE_VERSION') ?: defaultVersion).toString()
+
+def junitVersion = (findProperty('junitVersion') ?: '5.14.1').toString()
+def mockitoVersion = (findProperty('mockitoVersion') ?: '5.20.0').toString()
+def jacksonVersion = (findProperty('jacksonVersion') ?: '2.20.0').toString()
+def slf4jVersion = '2.0.13'
+def logbackVersion = '1.5.11'
+def testJavaVersion = (findProperty('testJavaVersion') ?: '17').toString().toInteger()
+def isReleaseVersion = !version.toString().endsWith('-SNAPSHOT')
+def prop = { String key, String fallback = '' ->
+  (findProperty(key) ?: fallback).toString()
+}
+
+repositories {
+  mavenCentral()
+}
+
+dependencies {
+  api platform("com.fasterxml.jackson:jackson-bom:${jacksonVersion}")
+  api 'com.fasterxml.jackson.core:jackson-databind'
+  api 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+
+  api "org.slf4j:slf4j-api:${slf4jVersion}"
+  api "org.opentest4j:opentest4j:1.3.0"
+
+  compileOnly platform("org.junit:junit-bom:${junitVersion}")
+  compileOnly 'org.junit.jupiter:junit-jupiter-api'
+  compileOnly "org.mockito:mockito-core:${mockitoVersion}"
+
+  testImplementation platform("org.junit:junit-bom:${junitVersion}")
+  testImplementation 'org.junit.jupiter:junit-jupiter'
+  testImplementation "org.mockito:mockito-core:${mockitoVersion}"
+  testImplementation 'org.junit.platform:junit-platform-testkit'
+  testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+  testRuntimeOnly "ch.qos.logback:logback-classic:${logbackVersion}"
+}
+
+test {
+  useJUnitPlatform {
+    excludeTags 'probe'
+  }
+  javaLauncher = javaToolchains.launcherFor {
+    languageVersion = JavaLanguageVersion.of(testJavaVersion)
+  }
+  systemProperty 'snapito.ci', 'false'
+  systemProperty 'snapito.snapshot.dir', 'src/test/resources/snapshots'
+}
+
+jacocoTestReport {
+  dependsOn test
+  reports {
+    xml.required = true
+    html.required = true
+  }
+}
+
+check.dependsOn jacocoTestReport
+
+java {
+  toolchain {
+    languageVersion = JavaLanguageVersion.of(17)
+  }
+  withSourcesJar()
+  withJavadocJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+  options.encoding = 'UTF-8'
+  options.compilerArgs << '-Xlint:all' << '-Xlint:-serial' << '-parameters'
+}
+
+tasks.named('javadoc') {
+  options.addStringOption('Xdoclint:none', '-quiet')
+}
+
+tasks.named('jar') {
+  from('LICENSE') { into 'META-INF' }
+}
+
+publishing {
+  publications {
+    mavenJava(MavenPublication) {
+      from components.java
+      pom {
+        name = prop('POM_NAME', 'snapito')
+        description = prop('POM_DESCRIPTION', 'Snapshot testing for JUnit 5 and Mockito, covering values and mock interactions')
+        url = prop('POM_URL', 'https://github.com/MicFabian/snapito')
+
+        licenses {
+          license {
+            name = prop('POM_LICENSE_NAME', 'The Apache License, Version 2.0')
+            url = prop('POM_LICENSE_URL', 'https://www.apache.org/licenses/LICENSE-2.0.txt')
+            distribution = 'repo'
+          }
+        }
+
+        developers {
+          developer {
+            id = prop('POM_DEVELOPER_ID', 'micfabian')
+            name = prop('POM_DEVELOPER_NAME', 'Michael Fabian')
+            email = prop('POM_DEVELOPER_EMAIL', 'mvirks@web.de')
+          }
+        }
+
+        scm {
+          connection = prop('POM_SCM_CONNECTION', 'scm:git:https://github.com/MicFabian/snapito.git')
+          developerConnection = prop('POM_SCM_DEV_CONNECTION', 'scm:git:ssh://git@github.com:MicFabian/snapito.git')
+          url = prop('POM_SCM_URL', 'https://github.com/MicFabian/snapito')
+        }
+      }
+    }
+  }
+}
+
+signing {
+  required = { isReleaseVersion }
+  def signingKey = findProperty('signingKey')?.toString()
+  def signingPassword = findProperty('signingPassword')?.toString()
+  if (signingKey) {
+    def normalizedSigningKey = signingKey
+      .replace('\r', '')
+      .replace('\\n', '\n')
+      .trim()
+    useInMemoryPgpKeys(normalizedSigningKey, signingPassword)
+  } else {
+    useGpgCmd()
+  }
+  sign publishing.publications
+}
+
+nexusPublishing {
+  repositories {
+    sonatype {
+      nexusUrl = uri('https://ossrh-staging-api.central.sonatype.com/service/local/')
+      snapshotRepositoryUrl = uri('https://central.sonatype.com/repository/maven-snapshots/')
+      username = prop('sonatypeUsername')
+      password = prop('sonatypePassword')
+    }
+  }
+}
+
+tasks.register('publishToMavenCentral') {
+  group = 'publishing'
+  description = 'Publishes this project to Maven Central via Sonatype Central Portal'
+  if (isReleaseVersion) {
+    dependsOn 'publishToSonatype', ':snapito-gradle-plugin:publishToSonatype', 'closeAndReleaseSonatypeStagingRepository'
+  } else {
+    dependsOn 'publishToSonatype', ':snapito-gradle-plugin:publishToSonatype'
+  }
+}

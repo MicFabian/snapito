@@ -1,0 +1,91 @@
+plugins {
+  id 'java-gradle-plugin'
+  id 'maven-publish'
+  id 'signing'
+}
+
+group = rootProject.group
+version = rootProject.version
+def isReleaseVersion = !version.toString().endsWith('-SNAPSHOT')
+def testJavaVersion = (findProperty('testJavaVersion') ?: '17').toString().toInteger()
+
+repositories {
+  mavenCentral()
+}
+
+java {
+  toolchain {
+    languageVersion = JavaLanguageVersion.of(17)
+  }
+  withSourcesJar()
+  withJavadocJar()
+}
+
+tasks.named('jar') {
+  from(rootProject.file('LICENSE')) { into 'META-INF' }
+}
+
+gradlePlugin {
+  plugins {
+    snapito {
+      id = 'io.github.micfabian.snapito'
+      implementationClass = 'io.github.micfabian.snapito.gradle.SnapitoPlugin'
+      displayName = 'Snapito snapshot workflow'
+      description = 'Adds verification, update, and obsolete snapshot cleanup tasks for Snapito'
+    }
+  }
+}
+
+publishing {
+  publications.withType(MavenPublication).configureEach {
+    pom {
+      name = 'snapito-gradle-plugin'
+      description = 'Gradle verification and update workflow for Snapito snapshots'
+      url = 'https://github.com/MicFabian/snapito'
+      licenses {
+        license {
+          name = 'The Apache License, Version 2.0'
+          url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+          distribution = 'repo'
+        }
+      }
+      developers {
+        developer {
+          id = 'micfabian'
+          name = 'Michael Fabian'
+          email = 'mvirks@web.de'
+        }
+      }
+      scm {
+        connection = 'scm:git:https://github.com/MicFabian/snapito.git'
+        developerConnection = 'scm:git:ssh://git@github.com:MicFabian/snapito.git'
+        url = 'https://github.com/MicFabian/snapito'
+      }
+    }
+  }
+}
+
+signing {
+  required = { isReleaseVersion }
+  def signingKey = findProperty('signingKey')?.toString() ?: rootProject.findProperty('signingKey')?.toString()
+  def signingPassword = findProperty('signingPassword')?.toString() ?: rootProject.findProperty('signingPassword')?.toString()
+  if (signingKey) {
+    useInMemoryPgpKeys(signingKey.replace('\r', '').replace('\\n', '\n').trim(), signingPassword)
+  } else {
+    useGpgCmd()
+  }
+  sign publishing.publications
+}
+
+dependencies {
+  testImplementation platform('org.junit:junit-bom:5.14.1')
+  testImplementation 'org.junit.jupiter:junit-jupiter'
+  testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(Test).configureEach {
+  useJUnitPlatform()
+  javaLauncher = javaToolchains.launcherFor {
+    languageVersion = JavaLanguageVersion.of(testJavaVersion)
+  }
+}

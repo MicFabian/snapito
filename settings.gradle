@@ -1,0 +1,2 @@
+rootProject.name = 'snapito'
+include 'snapito-gradle-plugin'

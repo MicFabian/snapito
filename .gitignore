@@ -1,0 +1,11 @@
+.gradle/
+build/
+*/build/
+bin/
+out/
+.idea/
+*.iml
+.DS_Store
+
+# Machine-specific toolchain discovery
+gradle.properties
