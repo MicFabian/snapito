@@ -116,11 +116,15 @@ public class Interactions {
     }
 
     String mockName = mockName(details);
+    Map<Invocation, String> renderedInvocations = new java.util.IdentityHashMap<>();
     Map<String, Integer> realInvocationCounts = new java.util.HashMap<>();
     for (Invocation invocation : details.getInvocations()) {
-      realInvocationCounts.merge(invocation.toString(), 1, Integer::sum);
+      String rendered = invocation.toString();
+      renderedInvocations.put(invocation, rendered);
+      realInvocationCounts.merge(rendered, 1, Integer::sum);
     }
 
+    Map<Method, String> methodNames = new java.util.IdentityHashMap<>();
     List<RecordedInvocation> recorded = new ArrayList<>();
     for (Invocation invocation : details.getInvocations()) {
       if (!includeUnverified && !invocation.isVerified()) {
@@ -134,10 +138,10 @@ public class Interactions {
       RecordedInvocation entry = new RecordedInvocation();
       entry.setGlobalSequence(invocation.getSequenceNumber());
       entry.setMock(mockName);
-      entry.setMethod(methodName(method));
+      entry.setMethod(methodNames.computeIfAbsent(method, this::methodName));
       entry.setArguments(arguments(invocation));
       if (includeReturnValues) {
-        int realCount = realInvocationCounts.getOrDefault(invocation.toString(), 1);
+        int realCount = realInvocationCounts.getOrDefault(renderedInvocations.get(invocation), 1);
         InvocationReturns.lookup(invocation, realCount).ifPresent(returns -> {
           if (returns.thrown() != null) {
             entry.setThrown(returns.thrown());

@@ -164,6 +164,57 @@ class RobustnessTest {
   }
 
   @Test
+  void doesNotSerializeTheValueWhenTheSnapshotAlreadyMatches() throws java.io.IOException {
+    java.nio.file.Path root = java.nio.file.Files.createTempDirectory("snapito-lazy");
+    SnapitoTestSupport.useTemporaryRoot(root);
+    SnapitoTestSupport.enterTest("LazyTest", "matches");
+    try {
+      CountingComparison comparison = new CountingComparison();
+      Snapito.expectNamed("lazy", "value", comparison);
+      int afterWrite = comparison.stores;
+
+      SnapitoTestSupport.enterTest("LazyTest", "matches");
+      Snapito.expectNamed("lazy", "value", comparison);
+
+      assertEquals(afterWrite, comparison.stores,
+        "A matching snapshot must not serialize the value again; those bytes are only needed for artifacts");
+    } finally {
+      SnapitoTestSupport.leaveTest();
+      Snapito.reloadConfiguration();
+    }
+  }
+
+  @Test
+  void stillSerializesTheValueWhenAMismatchNeedsArtifacts() throws java.io.IOException {
+    java.nio.file.Path root = java.nio.file.Files.createTempDirectory("snapito-lazy-miss");
+    SnapitoTestSupport.useTemporaryRoot(root);
+    SnapitoTestSupport.enterTest("LazyTest", "mismatches");
+    try {
+      CountingComparison comparison = new CountingComparison();
+      Snapito.expectNamed("lazy", "value", comparison);
+      int afterWrite = comparison.stores;
+
+      SnapitoTestSupport.enterTest("LazyTest", "mismatches");
+      assertThrows(AssertionError.class, () -> Snapito.expectNamed("lazy", "changed", comparison));
+
+      assertTrue(comparison.stores > afterWrite, "A mismatch must still produce the .actual artifact bytes");
+    } finally {
+      SnapitoTestSupport.leaveTest();
+      Snapito.reloadConfiguration();
+    }
+  }
+
+  static class CountingComparison extends TextComparison {
+    int stores;
+
+    @Override
+    public byte[] beforeStore(Object input) {
+      stores++;
+      return super.beforeStore(input);
+    }
+  }
+
+  @Test
   void doesNotMistakeProseForCsv() {
     assertInstanceOf(TextComparison.class, Comparisons.detect("Dear Bob,\nthanks for everything"));
   }

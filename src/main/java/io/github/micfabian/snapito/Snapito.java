@@ -114,7 +114,7 @@ public final class Snapito {
   public static SnapshotResult evaluate(Object actual, Comparison comparison) {
     Path resource = detectResource(comparison);
     Object current = comparison.beforeComparison(actual);
-    byte[] actualBytes = comparison.beforeStore(actual);
+    Supplier<byte[]> actualBytes = lazily(() -> comparison.beforeStore(actual));
     boolean updating = isUpdating(resource);
 
     if (!Files.exists(resource) || sizeOf(resource) == 0) {
@@ -428,10 +428,10 @@ public final class Snapito {
       Path resource,
       Comparison comparison,
       byte[] expectedBytes,
-      byte[] actualBytes,
+      Supplier<byte[]> actualBytes,
       String diff) {
     if (config.isWriteActualOnMismatch() && actualBytes != null) {
-      SnapshotArtifacts.write(SnapshotArtifacts.actualPath(resource), actualBytes, config.isAtomicWrites());
+      SnapshotArtifacts.write(SnapshotArtifacts.actualPath(resource), actualBytes.get(), config.isAtomicWrites());
     }
     if (config.isWriteDiffOnMismatch() && diff != null && !diff.isEmpty()) {
       SnapshotArtifacts.write(
@@ -443,9 +443,23 @@ public final class Snapito {
       && expectedBytes != null
       && actualBytes != null
       && comparison instanceof AdvancedComparison advanced) {
-      advanced.differenceArtifacts(expectedBytes, actualBytes).forEach((suffix, bytes) ->
+      advanced.differenceArtifacts(expectedBytes, actualBytes.get()).forEach((suffix, bytes) ->
         SnapshotArtifacts.write(SnapshotArtifacts.artifactPath(resource, suffix), bytes, config.isAtomicWrites()));
     }
+  }
+
+  private static Supplier<byte[]> lazily(Supplier<byte[]> source) {
+    return new Supplier<>() {
+      private byte[] value;
+
+      @Override
+      public byte[] get() {
+        if (value == null) {
+          value = source.get();
+        }
+        return value;
+      }
+    };
   }
 
   private static AssertionFailedError failure(SnapshotResult result) {

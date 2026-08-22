@@ -439,13 +439,19 @@ Snapshot writes use a per-path lock, temporary file, and atomic move where the f
 ./gradlew test -PtestJavaVersion=25
 ```
 
-Release:
+Release, which runs from GitHub Actions rather than a workstation:
 
 ```bash
-./gradlew publishToMavenCentral -PreleaseVersion=1.0.0
+git tag v1.0.0
+git push origin v1.0.0
 ```
 
-Required release secrets are `SONATYPE_USERNAME`, `SONATYPE_PASSWORD`, `SIGNING_KEY`, and `SIGNING_PASSWORD`.
+The `Release` workflow resolves the version from the tag, refuses to publish unless the tag points at the commit
+being built, verifies the secrets are present, runs the full test suite, and only then publishes to Maven Central.
+It can also be started manually with the `workflow_dispatch` input for a tag that already exists.
+
+Required repository secrets are `SONATYPE_USERNAME`, `SONATYPE_PASSWORD`, `SIGNING_KEY` (the ASCII-armored private
+key), and `SIGNING_PASSWORD`. A release fails fast with a clear message if any of them is missing.
 
 ## License
 
