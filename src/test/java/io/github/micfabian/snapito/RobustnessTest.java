@@ -145,6 +145,25 @@ class RobustnessTest {
   }
 
   @Test
+  void detectsShortStringsConsistentlyAtTheTextBoundary() {
+    assertInstanceOf(io.github.micfabian.snapito.comparison.JsonComparison.class, Comparisons.detect("abcd"));
+    assertInstanceOf(TextComparison.class, Comparisons.detect("abcde"));
+  }
+
+  @Test
+  void fallsBackToJsonForNullAndEmptyInput() {
+    assertInstanceOf(io.github.micfabian.snapito.comparison.JsonComparison.class, Comparisons.detect(null));
+    assertInstanceOf(io.github.micfabian.snapito.comparison.JsonComparison.class, Comparisons.detect(""));
+  }
+
+  @Test
+  void treatsAnEmptyOrTruncatedByteArrayAsBinary() {
+    assertInstanceOf(BinaryComparison.class, Comparisons.detect(new byte[0]));
+    assertInstanceOf(BinaryComparison.class,
+      Comparisons.detect(new byte[]{(byte) 0x89, (byte) 0x50, (byte) 0x4E, (byte) 0x47}));
+  }
+
+  @Test
   void doesNotMistakeProseForCsv() {
     assertInstanceOf(TextComparison.class, Comparisons.detect("Dear Bob,\nthanks for everything"));
   }

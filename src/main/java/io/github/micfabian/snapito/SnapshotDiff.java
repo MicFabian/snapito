@@ -135,12 +135,9 @@ public final class SnapshotDiff {
       List<String> differences,
       boolean[] truncated,
       BigDecimal numericTolerance) {
-    List<Object> keys = new ArrayList<>(expected.keySet());
-    for (Object key : actual.keySet()) {
-      if (!keys.contains(key)) {
-        keys.add(key);
-      }
-    }
+    java.util.Set<Object> union = new java.util.LinkedHashSet<>(expected.keySet());
+    union.addAll(actual.keySet());
+    List<Object> keys = new ArrayList<>(union);
     keys.sort(Comparator.comparing(String::valueOf));
 
     for (Object key : keys) {

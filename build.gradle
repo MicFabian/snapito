@@ -47,7 +47,9 @@ dependencies {
 
 test {
   useJUnitPlatform {
-    excludeTags 'probe'
+    if (!project.hasProperty('runProbes')) {
+      excludeTags 'probe'
+    }
   }
   javaLauncher = javaToolchains.launcherFor {
     languageVersion = JavaLanguageVersion.of(testJavaVersion)

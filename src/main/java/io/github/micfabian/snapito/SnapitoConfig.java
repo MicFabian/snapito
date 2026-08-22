@@ -153,7 +153,7 @@ public class SnapitoConfig {
 
   private static boolean booleanProperty(String name, boolean fallback) {
     String value = System.getProperty(name);
-    return value == null ? fallback : value.equalsIgnoreCase("true");
+    return value == null ? fallback : value.trim().equalsIgnoreCase("true");
   }
 
   private static String stringProperty(String primary, String fallback) {

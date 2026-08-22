@@ -206,18 +206,19 @@ public final class JsonNormalizers {
     if (path == null || path.isEmpty() || "$".equals(path)) {
       return List.of();
     }
-    String normalized = path.startsWith("$") ? path.substring(1) : path;
+    String normalized = path.startsWith("$") ? path.substring(1) : "." + path;
     List<String> result = new ArrayList<>();
+    int consumed = 0;
     Matcher matcher = PATH_TOKEN.matcher(normalized);
     while (matcher.find()) {
+      if (matcher.start() != consumed) {
+        throw new IllegalArgumentException("Unparseable snapshot path '" + path + "'");
+      }
+      consumed = matcher.end();
       result.add(matcher.group(1) != null ? matcher.group(1) : matcher.group(2));
     }
-    if (result.isEmpty() && !normalized.isEmpty()) {
-      for (String token : normalized.replaceFirst("^\\.", "").split("\\.")) {
-        if (!token.isEmpty()) {
-          result.add(token);
-        }
-      }
+    if (consumed != normalized.length()) {
+      throw new IllegalArgumentException("Unparseable snapshot path '" + path + "'");
     }
     return result;
   }

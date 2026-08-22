@@ -187,12 +187,25 @@ public final class Snapito {
   public static Object snapshot(Object actual, Comparison comparison) {
     Path resource = detectResource(comparison);
     Object current = comparison.beforeComparison(actual);
-    Object expected = readResource(resource, comparison);
+    boolean updating = isUpdating(resource);
 
+    if (!Files.exists(resource) || sizeOf(resource) == 0) {
+      if (!updating && isRunningInCi() && config.isFailOnMissingInCi()) {
+        MissingSnapshots.record(resource);
+        throw new AssertionFailedError(
+          "Missing snapshot for " + resource + System.lineSeparator()
+            + "Create or update the snapshot locally and commit the reviewed baseline",
+          null,
+          current == null ? null : String.valueOf(current));
+      }
+      return upsertResource(actual, resource, comparison);
+    }
+
+    Object expected = readResource(resource, comparison);
     if (matches(comparison, expected, current)) {
       return expected;
     }
-    if (isUpdating(resource) || !Files.exists(resource) || sizeOf(resource) == 0) {
+    if (updating) {
       return upsertResource(actual, resource, comparison);
     }
     return expected;

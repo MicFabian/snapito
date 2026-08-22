@@ -197,11 +197,24 @@ public class Interactions {
       }
       return collection.stream().map(item -> flatten(item, visited)).collect(Collectors.toList());
     }
+    if (isDefinitelyNotAMock(value)) {
+      return value;
+    }
     MockingDetails details = Mockito.mockingDetails(value);
     if (details.isMock() || details.isSpy()) {
       return "mock:" + mockName(details);
     }
     return value;
+  }
+
+  private static boolean isDefinitelyNotAMock(Object value) {
+    return value instanceof CharSequence
+      || value instanceof Number
+      || value instanceof Boolean
+      || value instanceof Character
+      || value instanceof Enum<?>
+      || value instanceof java.time.temporal.Temporal
+      || value instanceof java.util.UUID;
   }
 
   private boolean isIncluded(String methodName) {

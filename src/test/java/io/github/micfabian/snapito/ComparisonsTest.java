@@ -280,6 +280,14 @@ class ComparisonsTest {
     }
   }
 
+  static byte[] pngBytes() {
+    try {
+      return png(4, 4, Color.RED);
+    } catch (IOException e) {
+      throw new java.io.UncheckedIOException(e);
+    }
+  }
+
   static byte[] png(int width, int height, Color color) throws IOException {
     BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
     for (int y = 0; y < height; y++) {
