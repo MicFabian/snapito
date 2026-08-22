@@ -111,6 +111,21 @@ public final class Snapito {
     }
   }
 
+  public static void assertSnapshotNamed(String name, Object actual) {
+    assertSnapshotNamed(name, actual, DETECTOR.detect(actual));
+  }
+
+  public static void assertSnapshotNamed(String name, Object actual, Comparison comparison) {
+    withName(name, () -> {
+      assertSnapshot(actual, comparison);
+      return null;
+    });
+  }
+
+  public static Object current(Object actual, Comparison comparison) {
+    return comparison.beforeComparison(actual);
+  }
+
   public static SnapshotResult evaluate(Object actual, Comparison comparison) {
     Path resource = detectResource(comparison);
     Object current = comparison.beforeComparison(actual);

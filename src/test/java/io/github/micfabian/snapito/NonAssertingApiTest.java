@@ -177,6 +177,34 @@ class NonAssertingApiTest {
   }
 
   @Test
+  void assertsANamedSnapshotWithoutReturningIt() {
+    Snapito.assertSnapshotNamed("asserted", Map.of("amount", 1));
+
+    assertTrue(Files.exists(snapshot("asserted.json")));
+
+    SnapitoTestSupport.enterTest("LedgerServiceTest", "buildsALedger");
+    AssertionFailedError error = assertThrows(AssertionFailedError.class,
+      () -> Snapito.assertSnapshotNamed("asserted", Map.of("amount", 2)));
+    assertTrue(error.getMessage().contains("expected 1, but was 2"));
+  }
+
+  @Test
+  void assertsANamedSnapshotWithAnExplicitComparison() {
+    Snapito.assertSnapshotNamed("typed", "plain text", Comparisons.TXT);
+
+    assertTrue(Files.exists(snapshot("typed.txt")));
+  }
+
+  @Test
+  void exposesTheNormalizedFormOfAValue() {
+    Object normalized = Snapito.current(Map.of("roles", List.of("b", "a")),
+      Comparisons.json(json -> json.unordered("$.roles")));
+
+    assertEquals(Map.of("roles", List.of("a", "b")), normalized,
+      "current() must return what the comparison would actually compare, not the raw value");
+  }
+
+  @Test
   void detectsTheComparisonForUnnamedSnapshots() {
     Snapito.snapshot(Map.of("amount", 1));
 
