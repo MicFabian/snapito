@@ -214,6 +214,9 @@ Snapito.expect(imageBytes, pixels);
 
 Pixel mismatches produce a red-overlay `*.diff.png` alongside the textual diff.
 
+Pixel mode compares decoded pixel buffers directly; the stored snapshot stays an ordinary PNG file, so a full-page
+screenshot costs its real size rather than an inflated text encoding.
+
 ## Review artifacts
 
 On mismatch Snapito can write:
@@ -337,6 +340,15 @@ Snapito.verifyAll(session -> {
 
 Every snapshot is evaluated, and all failures are reported together.
 
+## Parallel execution
+
+Snapito is safe under `junit.jupiter.execution.parallel.enabled=true`. Configuration is published as an immutable
+snapshot, `Snapito.getConfig()` returns a copy rather than the live instance, and each test's naming state is
+thread-confined and cleared after the test.
+
+Note that `Snapito.configure(...)` still changes global state for the whole JVM, so call it from a fixture that
+applies to every test rather than from one test that runs alongside others.
+
 ## Configuration
 
 ```java
@@ -398,6 +410,9 @@ Providers may also be discovered through Java `ServiceLoader` using
 ```text
 src/test/resources/snapshots/<package>/<class-kebab>/<test>.ext
 ```
+
+Test names are converted to kebab-case on word boundaries, including acronyms, so `booksAPaymentInEuros` becomes
+`books-a-payment-in-euros.json` and `parseHTTPResponse` becomes `parse-http-response.json`.
 
 Snapshot writes use a per-path lock, temporary file, and atomic move where the filesystem supports it.
 

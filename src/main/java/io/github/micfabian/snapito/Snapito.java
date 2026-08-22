@@ -31,8 +31,8 @@ public final class Snapito {
   private static final ThreadLocal<Boolean> UPDATE_OVERRIDE = new ThreadLocal<>();
   private static final ThreadLocal<String> NAME_OVERRIDE = new ThreadLocal<>();
 
-  private static SnapitoConfig config = SnapitoConfig.fromEnvironment();
-  private static Path snapshotsRoot = config.getRootPath();
+  private static volatile SnapitoConfig config = SnapitoConfig.fromEnvironment();
+  private static volatile Path snapshotsRoot = config.getRootPath();
 
   private Snapito() {
   }
@@ -257,18 +257,21 @@ public final class Snapito {
     FALLBACK_COUNTS.remove();
   }
 
-  public static void configure(Consumer<SnapitoConfig> block) {
-    block.accept(config);
-    snapshotsRoot = config.getRootPath();
+  public static synchronized void configure(Consumer<SnapitoConfig> block) {
+    SnapitoConfig updated = config.copy();
+    block.accept(updated);
+    config = updated;
+    snapshotsRoot = updated.getRootPath();
   }
 
-  public static void reloadConfiguration() {
-    config = SnapitoConfig.fromEnvironment();
-    snapshotsRoot = config.getRootPath();
+  public static synchronized void reloadConfiguration() {
+    SnapitoConfig reloaded = SnapitoConfig.fromEnvironment();
+    config = reloaded;
+    snapshotsRoot = reloaded.getRootPath();
   }
 
   public static SnapitoConfig getConfig() {
-    return config;
+    return config.copy();
   }
 
   public static Path getSnapshotsRoot() {
@@ -511,7 +514,9 @@ public final class Snapito {
     if (name == null || name.isEmpty()) {
       return "";
     }
-    return name.toLowerCase(Locale.ENGLISH)
+    return name.replaceAll("([a-z0-9])([A-Z])", "$1-$2")
+      .replaceAll("([A-Z]+)([A-Z][a-z])", "$1-$2")
+      .toLowerCase(Locale.ENGLISH)
       .replaceAll("[^a-z0-9]+", "-")
       .replaceAll("^-+|-+$", "");
   }

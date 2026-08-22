@@ -147,6 +147,25 @@ class SnapitoTest {
   }
 
   @Test
+  void turnsCamelCaseTestNamesIntoReadableFileNames() {
+    SnapitoTestSupport.enterTest("PaymentServiceTest", "booksAPaymentInEuros");
+
+    Snapito.expect(Map.of("amount", 1));
+
+    assertTrue(Files.exists(snapshotPath("books-a-payment-in-euros.json")),
+      "A camelCase Java method name must not collapse into one unreadable word");
+  }
+
+  @Test
+  void splitsAcronymsInTestNamesOnWordBoundaries() {
+    SnapitoTestSupport.enterTest("PaymentServiceTest", "parseHTTPResponse");
+
+    Snapito.expect(Map.of("status", 200));
+
+    assertTrue(Files.exists(snapshotPath("parse-http-response.json")));
+  }
+
+  @Test
   void numbersUnnamedSnapshotsWithinOneTest() {
     Snapito.expect(Map.of("first", 1));
     Snapito.expect(Map.of("second", 2));

@@ -82,9 +82,37 @@ class RobustnessTest {
     PngComparison comparison = new PngComparison(PngComparison.Mode.PIXEL);
 
     IllegalArgumentException error =
-      assertThrows(IllegalArgumentException.class, () -> comparison.matches("", "2x2:00000000"));
+      assertThrows(IllegalArgumentException.class, () -> comparison.matches("", new byte[]{1, 2, 3}));
 
-    assertTrue(error.getMessage().contains("malformed"));
+    assertTrue(error.getMessage().contains("expected decoded pixels"));
+  }
+
+  @Test
+  void comparesPngPixelsWithoutBuildingAHugeIntermediateString() {
+    PngComparison comparison = new PngComparison(PngComparison.Mode.PIXEL);
+
+    Object decoded = comparison.beforeComparison(redPng());
+
+    assertFalse(decoded instanceof CharSequence,
+      "Pixel mode must not expand an image into a hex string; that cost ~1500x the PNG size");
+    assertTrue(comparison.matches(decoded, comparison.beforeComparison(redPng())));
+  }
+
+  private static byte[] redPng() {
+    try {
+      java.awt.image.BufferedImage image =
+        new java.awt.image.BufferedImage(8, 8, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+      for (int y = 0; y < 8; y++) {
+        for (int x = 0; x < 8; x++) {
+          image.setRGB(x, y, java.awt.Color.RED.getRGB());
+        }
+      }
+      var output = new java.io.ByteArrayOutputStream();
+      javax.imageio.ImageIO.write(image, "png", output);
+      return output.toByteArray();
+    } catch (java.io.IOException e) {
+      throw new java.io.UncheckedIOException(e);
+    }
   }
 
   @Test

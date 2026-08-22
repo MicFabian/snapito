@@ -50,9 +50,9 @@ public class PngComparison extends BinaryComparison {
 
   @Override
   public Object beforeComparison(Object input) {
-    BufferedImage image = readImage((byte[]) input);
+    BufferedImage image = readImage(toBytes(input));
     if (comparisonMode == Mode.PIXEL) {
-      return encodePixels(image);
+      return pixelData(image);
     }
     return new Dimensions(image.getWidth(), image.getHeight());
   }
@@ -67,13 +67,13 @@ public class PngComparison extends BinaryComparison {
     if (comparisonMode == Mode.SIZE) {
       return Objects.equals(expected, actual);
     }
-    PixelData left = decodePixels(String.valueOf(expected));
-    PixelData right = decodePixels(String.valueOf(actual));
-    if (left.width != right.width || left.height != right.height) {
+    PixelData left = asPixelData(expected);
+    PixelData right = asPixelData(actual);
+    if (left.width() != right.width() || left.height() != right.height()) {
       return false;
     }
-    int different = differentPixels(left.pixels, right.pixels);
-    return different <= Math.floor(left.pixels.length * maxDifferentPixelRatio);
+    int different = differentPixels(left.pixels(), right.pixels());
+    return different <= Math.floor(left.pixels().length * maxDifferentPixelRatio);
   }
 
   @Override
@@ -81,15 +81,15 @@ public class PngComparison extends BinaryComparison {
     if (comparisonMode == Mode.SIZE) {
       return SnapshotDiff.describe(expected, actual);
     }
-    PixelData left = decodePixels(String.valueOf(expected));
-    PixelData right = decodePixels(String.valueOf(actual));
-    if (left.width != right.width || left.height != right.height) {
-      return "PNG dimensions differ: expected " + left.width + "x" + left.height
-        + ", but was " + right.width + "x" + right.height;
+    PixelData left = asPixelData(expected);
+    PixelData right = asPixelData(actual);
+    if (left.width() != right.width() || left.height() != right.height()) {
+      return "PNG dimensions differ: expected " + left.width() + "x" + left.height()
+        + ", but was " + right.width() + "x" + right.height();
     }
-    int count = differentPixels(left.pixels, right.pixels);
-    double ratio = left.pixels.length == 0 ? 0.0d : count / (double) left.pixels.length;
-    return "PNG pixels differ: " + count + "/" + left.pixels.length
+    int count = differentPixels(left.pixels(), right.pixels());
+    double ratio = left.pixels().length == 0 ? 0.0d : count / (double) left.pixels().length;
+    return "PNG pixels differ: " + count + "/" + left.pixels().length
       + " (" + String.format(Locale.ROOT, "%.4f%%", ratio * 100.0d) + "), allowed "
       + String.format(Locale.ROOT, "%.4f%%", maxDifferentPixelRatio * 100.0d)
       + " with channel tolerance " + channelTolerance;
@@ -162,44 +162,50 @@ public class PngComparison extends BinaryComparison {
     }
   }
 
-  private static String encodePixels(BufferedImage image) {
-    int[] pixels = image.getRGB(0, 0, image.getWidth(), image.getHeight(), null, 0, image.getWidth());
-    StringBuilder builder = new StringBuilder();
-    builder.append(image.getWidth()).append('x').append(image.getHeight()).append(':');
-    for (int pixel : pixels) {
-      builder.append(String.format("%08x", pixel));
-    }
-    return builder.toString();
+  private static PixelData pixelData(BufferedImage image) {
+    return new PixelData(
+      image.getWidth(),
+      image.getHeight(),
+      image.getRGB(0, 0, image.getWidth(), image.getHeight(), null, 0, image.getWidth()));
   }
 
-  private static PixelData decodePixels(String encoded) {
-    int separator = encoded == null ? -1 : encoded.indexOf(':');
-    if (separator < 0) {
-      throw new IllegalArgumentException(
-        "PNG snapshot is missing or malformed; expected '<width>x<height>:<hex pixels>' but got "
-          + (encoded == null || encoded.isEmpty() ? "an empty value" : "'" + truncate(encoded) + "'"));
+  private static PixelData asPixelData(Object value) {
+    if (value instanceof PixelData pixels) {
+      return pixels;
     }
-    String[] dimensions = encoded.substring(0, separator).split("x");
-    if (dimensions.length != 2) {
-      throw new IllegalArgumentException("PNG snapshot has a malformed dimension header: '" + truncate(encoded) + "'");
+    if (value instanceof byte[] bytes) {
+      return pixelData(readImage(bytes));
     }
-    String values = encoded.substring(separator + 1);
-    int[] pixels = new int[values.length() / 8];
-    for (int index = 0; index < pixels.length; index++) {
-      pixels[index] = (int) Long.parseLong(values.substring(index * 8, index * 8 + 8), 16);
-    }
-    try {
-      return new PixelData(Integer.parseInt(dimensions[0]), Integer.parseInt(dimensions[1]), pixels);
-    } catch (NumberFormatException e) {
-      throw new IllegalArgumentException("PNG snapshot has a malformed dimension header: '" + truncate(encoded) + "'", e);
-    }
+    throw new IllegalArgumentException(
+      "PNG comparison expected decoded pixels but got " + (value == null ? "null" : value.getClass()));
   }
 
-  private static String truncate(String value) {
-    return value.length() <= 40 ? value : value.substring(0, 40) + "...";
+  private static byte[] toBytes(Object input) {
+    if (input instanceof byte[] bytes) {
+      return bytes;
+    }
+    throw new IllegalArgumentException(
+      "PngComparison input must provide PNG bytes, input was " + (input == null ? "null" : input.getClass()));
   }
 
   private record PixelData(int width, int height, int[] pixels) {
+    @Override
+    public boolean equals(Object other) {
+      return other instanceof PixelData that
+        && width == that.width
+        && height == that.height
+        && java.util.Arrays.equals(pixels, that.pixels);
+    }
+
+    @Override
+    public int hashCode() {
+      return 31 * (31 * width + height) + java.util.Arrays.hashCode(pixels);
+    }
+
+    @Override
+    public String toString() {
+      return "PixelData(" + width + "x" + height + ", " + pixels.length + " pixels)";
+    }
   }
 
   public record Dimensions(int width, int height) {

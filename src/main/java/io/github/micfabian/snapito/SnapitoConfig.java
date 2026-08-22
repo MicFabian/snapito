@@ -20,6 +20,22 @@ public class SnapitoConfig {
   private boolean writeIndex = false;
   private List<String> updateOnly = new ArrayList<>();
 
+  public SnapitoConfig copy() {
+    SnapitoConfig copy = new SnapitoConfig();
+    copy.rootPath = rootPath;
+    copy.failOnMissing = failOnMissing;
+    copy.failOnMissingInCi = failOnMissingInCi;
+    copy.allowUpdateInCi = allowUpdateInCi;
+    copy.writeActualOnMismatch = writeActualOnMismatch;
+    copy.writeDiffOnMismatch = writeDiffOnMismatch;
+    copy.cleanObsoleteSnapshots = cleanObsoleteSnapshots;
+    copy.atomicWrites = atomicWrites;
+    copy.reportMissing = reportMissing;
+    copy.writeIndex = writeIndex;
+    copy.updateOnly = new ArrayList<>(updateOnly);
+    return copy;
+  }
+
   public static SnapitoConfig fromEnvironment() {
     SnapitoConfig config = new SnapitoConfig();
     config.rootPath = Paths.get(stringProperty("snapito.snapshot.dir", "src/test/resources/snapshots"));
