@@ -73,8 +73,9 @@ public final class Json {
     }
     if (node.isObject()) {
       Map<String, Object> map = new LinkedHashMap<>();
-      ObjectNode object = (ObjectNode) node;
-      object.fieldNames().forEachRemaining(name -> map.put(name, toPlain(object.get(name))));
+      for (Map.Entry<String, JsonNode> field : ((ObjectNode) node).properties()) {
+        map.put(field.getKey(), toPlain(field.getValue()));
+      }
       return map;
     }
     if (node.isArray()) {

@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -132,7 +133,7 @@ public final class Snapito {
     Supplier<byte[]> actualBytes = lazily(() -> comparison.beforeStore(actual));
     boolean updating = isUpdating(resource);
 
-    if (!Files.exists(resource) || sizeOf(resource) == 0) {
+    if (sizeOf(resource) <= 0) {
       boolean mustFail = config.isFailOnMissing()
         || config.isReportMissing()
         || (isRunningInCi() && config.isFailOnMissingInCi());
@@ -158,7 +159,7 @@ public final class Snapito {
     }
 
     byte[] expectedBytes = SnapshotArtifacts.read(resource);
-    Object expected = readResource(resource, comparison);
+    Object expected = restore(resource, expectedBytes, comparison);
 
     if (matches(comparison, expected, current)) {
       SnapshotArtifacts.clearFailureArtifacts(resource, List.of(".diff.png"));
@@ -411,15 +412,21 @@ public final class Snapito {
     if (!Files.isReadable(resource)) {
       return "";
     }
+    return restore(resource, SnapshotArtifacts.read(resource), comparison);
+  }
+
+  private static Object restore(Path resource, byte[] bytes, Comparison comparison) {
     SnapshotCleanup.reference(resource);
     LOG.debug("Restoring snapshot from {}", resource);
-    Object restored = comparison.afterRestore(SnapshotArtifacts.read(resource));
+    Object restored = comparison.afterRestore(bytes);
     return comparison.beforeComparison(restored);
   }
 
   private static long sizeOf(Path resource) {
     try {
       return Files.size(resource);
+    } catch (NoSuchFileException e) {
+      return -1;
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
