@@ -193,6 +193,16 @@ Snapito.expect(response, comparison);
 Supported path syntax covers object properties, numeric indexes, and wildcards, for example `$.items[*].id`. Normalized
 JSON is written to the snapshot, so ignored volatile values no longer create review noise.
 
+When a JSON source gives no ordering guarantee, ignore array order everywhere instead of listing paths:
+
+```java
+Snapito.expect(response, Comparisons.jsonIgnoringArrayOrder());
+Snapito.expect(response, Comparisons.json(json -> json.ignoringArrayOrder().excludingProperties("id")));
+```
+
+Object key order never matters for the comparison. Arrays are sorted deterministically before they are compared and
+stored, so the baseline stays stable.
+
 Derive a variant without touching the original:
 
 ```java
