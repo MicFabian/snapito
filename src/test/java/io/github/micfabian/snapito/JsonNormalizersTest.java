@@ -95,6 +95,33 @@ class JsonNormalizersTest {
   }
 
   @Test
+  void ignoringArrayOrderSortsEveryListIncludingNestedOnes() {
+    Object result = normalize(
+      json -> json.ignoringArrayOrder(),
+      mutable("b", list("z", "a"), "a", list(mutable("k", list(2, 1)), mutable("k", list(0)))));
+
+    assertEquals(
+      Map.of("a", List.of(Map.of("k", List.of(num(0))), Map.of("k", List.of(num(1), num(2)))), "b", List.of("a", "z")),
+      result);
+  }
+
+  @Test
+  void ignoringArrayOrderMakesDifferentlyOrderedDocumentsEqual() {
+    JsonComparison comparison = JsonComparison.configured(json -> json.ignoringArrayOrder());
+    Object left = comparison.beforeComparison("{\"items\":[{\"a\":1,\"b\":2},{\"a\":3}],\"t\":[\"x\",\"y\"]}");
+    Object right = comparison.beforeComparison("{\"t\":[\"y\",\"x\"],\"items\":[{\"a\":3},{\"b\":2,\"a\":1}]}");
+
+    assertTrue(comparison.matches(left, right));
+  }
+
+  @Test
+  void listOrderStillMattersByDefault() {
+    JsonComparison comparison = new JsonComparison();
+
+    assertFalse(comparison.matches(comparison.beforeComparison("[1,2]"), comparison.beforeComparison("[2,1]")));
+  }
+
+  @Test
   void sortsListsOfNumbersByTheirRenderedValue() {
     Object result = normalize(json -> json.unordered("$.values"), mutable("values", list(10, 2)));
 

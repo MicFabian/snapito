@@ -13,7 +13,7 @@ Reach for it when the expected result is large or structured. A single scalar is
 ## Setup
 
 ```groovy
-testImplementation 'io.github.micfabian:snapito:1.0.0'
+testImplementation 'io.github.micfabian:snapito:1.2.0'
 ```
 
 Compile tests with `-parameters`, or `@SnapshotKey` cannot use real parameter names:

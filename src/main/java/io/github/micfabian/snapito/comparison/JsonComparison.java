@@ -24,6 +24,7 @@ public class JsonComparison implements AdvancedComparison {
   private final Map<String, String> sortedPaths = new LinkedHashMap<>();
   private final Map<Pattern, String> regexReplacements = new LinkedHashMap<>();
   private BigDecimal numericTolerance = BigDecimal.ZERO;
+  private boolean ignoreArrayOrder = false;
   private boolean shared = false;
 
   public JsonComparison() {
@@ -90,6 +91,12 @@ public class JsonComparison implements AdvancedComparison {
     return this;
   }
 
+  public JsonComparison ignoringArrayOrder() {
+    checkMutable();
+    ignoreArrayOrder = true;
+    return this;
+  }
+
   public JsonComparison sortedBy(String path, String field) {
     checkMutable();
     sortedPaths.put(path, field);
@@ -126,6 +133,7 @@ public class JsonComparison implements AdvancedComparison {
     copy.sortedPaths.putAll(sortedPaths);
     copy.regexReplacements.putAll(regexReplacements);
     copy.numericTolerance = numericTolerance;
+    copy.ignoreArrayOrder = ignoreArrayOrder;
   }
 
   public JsonComparison with(Consumer<JsonComparison> configuration) {
@@ -158,6 +166,9 @@ public class JsonComparison implements AdvancedComparison {
     Object normalized = JsonNormalizers.copy(plain);
     removeExcludedProperties(normalized);
     JsonNormalizers.removePaths(normalized, excludedPaths);
+    if (ignoreArrayOrder) {
+      JsonNormalizers.sortAllLists(normalized);
+    }
     JsonNormalizers.sortPaths(normalized, unorderedPaths);
     JsonNormalizers.sortPathsBy(normalized, sortedPaths);
     return JsonNormalizers.replaceRegex(normalized, regexReplacements);

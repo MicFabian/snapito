@@ -44,6 +44,46 @@ public final class JsonNormalizers {
     }
   }
 
+  @SuppressWarnings("unchecked")
+  public static void sortAllLists(Object current) {
+    if (current instanceof Map<?, ?> map) {
+      for (Object item : map.values()) {
+        sortAllLists(item);
+      }
+      return;
+    }
+    if (current instanceof List<?> rawList) {
+      List<Object> list = (List<Object>) rawList;
+      for (Object item : list) {
+        sortAllLists(item);
+      }
+      list.sort((left, right) -> canonical(left).compareTo(canonical(right)));
+    }
+  }
+
+  private static String canonical(Object value) {
+    if (value == null || value instanceof CharSequence || value instanceof Number || value instanceof Boolean) {
+      return String.valueOf(value);
+    }
+    return Json.write(sortedKeys(value));
+  }
+
+  private static Object sortedKeys(Object value) {
+    if (value instanceof Map<?, ?> map) {
+      Map<String, Object> sorted = new java.util.TreeMap<>();
+      map.forEach((key, item) -> sorted.put(String.valueOf(key), sortedKeys(item)));
+      return sorted;
+    }
+    if (value instanceof List<?> list) {
+      List<Object> result = new ArrayList<>(list.size());
+      for (Object item : list) {
+        result.add(sortedKeys(item));
+      }
+      return result;
+    }
+    return value;
+  }
+
   public static void sortPathsBy(Object root, Map<String, String> paths) {
     paths.forEach((path, field) -> sort(root, tokens(path), 0, field));
   }

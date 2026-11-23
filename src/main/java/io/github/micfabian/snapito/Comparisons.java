@@ -54,6 +54,10 @@ public final class Comparisons {
     return new JsonComparison().excludingPaths(paths);
   }
 
+  public static JsonComparison jsonIgnoringArrayOrder() {
+    return new JsonComparison().ignoringArrayOrder();
+  }
+
   public static JsonComparison json(Consumer<JsonComparison> configuration) {
     return JsonComparison.configured(configuration);
   }

@@ -20,7 +20,7 @@ repositories {
 }
 
 dependencies {
-  testImplementation 'io.github.micfabian:snapito:1.0.0' // replace with latest
+  testImplementation 'io.github.micfabian:snapito:1.2.0' // replace with latest
   testImplementation 'org.junit.jupiter:junit-jupiter:5.14.1'
   testImplementation 'org.mockito:mockito-core:5.20.0'
 }
@@ -193,6 +193,16 @@ Snapito.expect(response, comparison);
 Supported path syntax covers object properties, numeric indexes, and wildcards, for example `$.items[*].id`. Normalized
 JSON is written to the snapshot, so ignored volatile values no longer create review noise.
 
+When a JSON source gives no ordering guarantee, ignore array order everywhere instead of listing paths:
+
+```java
+Snapito.expect(response, Comparisons.jsonIgnoringArrayOrder());
+Snapito.expect(response, Comparisons.json(json -> json.ignoringArrayOrder().excludingProperties("id")));
+```
+
+Object key order never matters for the comparison. Arrays are sorted deterministically before they are compared and
+stored, so the baseline stays stable.
+
 Derive a variant without touching the original:
 
 ```java
@@ -282,7 +292,7 @@ pluginManagement {
 
 ```groovy
 plugins {
-  id 'io.github.micfabian.snapito' version '1.0.0' // replace with latest
+  id 'io.github.micfabian.snapito' version '1.2.0' // replace with latest
 }
 ```
 

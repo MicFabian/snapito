@@ -15,7 +15,7 @@ snapshot one.
 ## Setup
 
 ```groovy
-testImplementation 'io.github.micfabian:snapito:1.0.0'
+testImplementation 'io.github.micfabian:snapito:1.2.0'
 tasks.withType(JavaCompile).configureEach { options.compilerArgs << '-parameters' }
 ```
 
