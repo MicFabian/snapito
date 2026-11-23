@@ -203,6 +203,15 @@ Snapito.expect(response, Comparisons.json(json -> json.ignoringArrayOrder().excl
 Object key order never matters for the comparison. Arrays are sorted deterministically before they are compared and
 stored, so the baseline stays stable.
 
+For a one-off configuration, skip the intermediate comparison:
+
+```java
+Snapito.expectJson(response, json -> json
+  .excludingPaths("$.request.id")
+  .ignoringArrayOrder());
+Snapito.expectJsonNamed("summary", response, json -> json.excludingProperties("traceId"));
+```
+
 Derive a variant without touching the original:
 
 ```java
