@@ -355,6 +355,15 @@ filter a run (`--tests 'ApiTest.oneMethod'`, `@Disabled`, tag filters), cleanup 
 reason is logged, so a narrow run can never delete baselines belonging to the tests it did not run.
 - `reportMissingSnapito` writes every missing baseline and reports them without failing on mismatches.
 - `indexSnapito` writes the snapshot provenance index.
+- `reviewSnapito` writes `build/reports/snapito/index.html` listing every pending change with its diff, and prints a
+  summary.
+- `acceptSnapito` accepts pending changes selectively instead of updating everything:
+
+```bash
+./gradlew reviewSnapito
+./gradlew acceptSnapito -Psnapito.accept='api/*.json'
+./gradlew acceptSnapito -Psnapito.accept=all
+```
 
 ## Named and data-driven snapshots
 
