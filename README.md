@@ -218,6 +218,24 @@ Derive a variant without touching the original:
 var stricter = comparison.with(json -> json.excludingProperties("traceId"));
 ```
 
+## SQL snapshots
+
+Record the statements your code sends to the database and review them like any other baseline:
+
+```java
+SqlRecorder recorder = new SqlRecorder();
+DataSource recorded = recorder.wrap(dataSource);
+
+new OrderService(recorded).placeOrder(order);
+
+Snapito.expectQueries(recorder);
+```
+
+Each entry holds a sequence number, the whitespace-normalized SQL, the bound parameters in index order, and the batch
+size for `executeBatch`. A new N+1 query shows up as extra lines in the diff. Use `new SqlRecorder().withoutParameters()`
+to keep volatile parameter values out of the file, or combine it with JSON masking by passing `recorder.statements()` to
+`Snapito.expectJson(...)`.
+
 ## PNG comparison and visual diffs
 
 ```java
