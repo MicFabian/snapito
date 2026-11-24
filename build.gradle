@@ -11,6 +11,7 @@ def defaultVersion = '1.2.0'
 version = (findProperty('releaseVersion') ?: System.getenv('RELEASE_VERSION') ?: defaultVersion).toString()
 
 def junitVersion = (findProperty('junitVersion') ?: '5.14.1').toString()
+def springVersion = (findProperty('springVersion') ?: '6.2.1').toString()
 def mockitoVersion = (findProperty('mockitoVersion') ?: '5.20.0').toString()
 def jacksonVersion = (findProperty('jacksonVersion') ?: '2.20.0').toString()
 def slf4jVersion = '2.0.13'
@@ -36,10 +37,15 @@ dependencies {
   compileOnly platform("org.junit:junit-bom:${junitVersion}")
   compileOnly 'org.junit.jupiter:junit-jupiter-api'
   compileOnly "org.mockito:mockito-core:${mockitoVersion}"
+  compileOnly "org.springframework:spring-test:${springVersion}"
+  compileOnly 'jakarta.servlet:jakarta.servlet-api:6.0.0'
 
   testImplementation platform("org.junit:junit-bom:${junitVersion}")
   testImplementation 'org.junit.jupiter:junit-jupiter'
   testImplementation "org.mockito:mockito-core:${mockitoVersion}"
+  testImplementation "org.springframework:spring-test:${springVersion}"
+  testImplementation "org.springframework:spring-web:${springVersion}"
+  testImplementation 'jakarta.servlet:jakarta.servlet-api:6.0.0'
   testImplementation 'org.junit.platform:junit-platform-testkit'
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
   testRuntimeOnly "ch.qos.logback:logback-classic:${logbackVersion}"
