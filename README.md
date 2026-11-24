@@ -20,7 +20,7 @@ repositories {
 }
 
 dependencies {
-  testImplementation 'io.github.micfabian:snapito:1.2.0' // replace with latest
+  testImplementation 'io.github.micfabian:snapito:1.3.0' // replace with latest
   testImplementation 'org.junit.jupiter:junit-jupiter:5.14.1'
   testImplementation 'org.mockito:mockito-core:5.20.0'
 }
@@ -368,7 +368,7 @@ pluginManagement {
 
 ```groovy
 plugins {
-  id 'io.github.micfabian.snapito' version '1.2.0' // replace with latest
+  id 'io.github.micfabian.snapito' version '1.3.0' // replace with latest
 }
 ```
 

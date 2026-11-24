@@ -7,7 +7,7 @@ plugins {
 }
 
 group = 'io.github.micfabian'
-def defaultVersion = '1.2.0'
+def defaultVersion = '1.3.0'
 version = (findProperty('releaseVersion') ?: System.getenv('RELEASE_VERSION') ?: defaultVersion).toString()
 
 def junitVersion = (findProperty('junitVersion') ?: '5.14.1').toString()
