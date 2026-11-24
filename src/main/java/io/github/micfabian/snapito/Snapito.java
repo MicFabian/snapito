@@ -66,6 +66,14 @@ public final class Snapito {
     expectNamed(name, actual, Comparisons.json(configuration));
   }
 
+  public static void expectShape(Object actual) {
+    expectJson(actual, json -> json.shapeOnly());
+  }
+
+  public static void expectShapeNamed(String name, Object actual) {
+    expectJsonNamed(name, actual, json -> json.shapeOnly());
+  }
+
   public static void expectInteractions(Object... mocks) {
     expectInteractions(Interactions.defaults(), mocks);
   }

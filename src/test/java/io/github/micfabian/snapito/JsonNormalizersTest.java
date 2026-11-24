@@ -2,9 +2,11 @@ package io.github.micfabian.snapito;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.micfabian.snapito.comparison.JsonComparison;
+import io.github.micfabian.snapito.comparison.ValueType;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -160,6 +162,50 @@ class JsonNormalizersTest {
       "{\"id\":\"11111111-1111-1111-1111-111111111111\",\"at\":\"2026-01-01T00:00:00Z\"}");
 
     assertEquals(Map.of("id", "<uuid-1>", "at", "2026-01-01T00:00:00Z"), onlyUuids);
+  }
+
+  @Test
+  void onlyPathsKeepsJustTheSelectedParts() {
+    JsonComparison comparison = JsonComparison.configured(json -> json.onlyPaths("$.items[*].name", "$.meta.total"));
+    Object kept = comparison.beforeComparison(
+      "{\"items\":[{\"name\":\"a\",\"price\":1},{\"name\":\"b\",\"price\":2}],\"meta\":{\"total\":2,\"page\":1},\"noise\":true}");
+
+    assertEquals(
+      Map.of("items", List.of(Map.of("name", "a"), Map.of("name", "b")), "meta", Map.of("total", num(2))),
+      kept);
+    assertEquals(kept, comparison.beforeComparison(comparison.afterRestore(comparison.beforeStore(kept))));
+  }
+
+  @Test
+  void onlyPathsRejectsIndexPositions() {
+    assertThrows(IllegalArgumentException.class, () -> new JsonComparison().onlyPaths("$.items[1].name"));
+  }
+
+  @Test
+  void asTypeReplacesValuesOfTheRightTypeAndKeepsOthersVisible() {
+    JsonComparison comparison = JsonComparison.configured(json -> json
+      .asType("$.createdAt", ValueType.TIMESTAMP)
+      .asType("$.items[*].id", ValueType.UUID));
+    Object result = comparison.beforeComparison(
+      "{\"createdAt\":\"2026-11-24T10:15:30Z\",\"items\":[{\"id\":\"11111111-1111-1111-1111-111111111111\"},{\"id\":\"not-a-uuid\"}]}");
+
+    assertEquals(
+      Map.of("createdAt", "<timestamp>", "items", List.of(Map.of("id", "<uuid>"), Map.of("id", "not-a-uuid"))),
+      result);
+  }
+
+  @Test
+  void shapeOnlyKeepsStructureAndTypesAndIsIdempotent() {
+    JsonComparison comparison = JsonComparison.configured(json -> json.shapeOnly());
+    Object shape = comparison.beforeComparison(
+      "{\"id\":7,\"name\":\"x\",\"ok\":true,\"none\":null,\"tags\":[\"a\",\"b\"],\"rows\":[{\"v\":1},{\"v\":2}]}");
+
+    assertEquals(
+      Map.of(
+        "id", "<number>", "name", "<string>", "ok", "<boolean>", "none", "<null>",
+        "tags", List.of("<string>"), "rows", List.of(Map.of("v", "<number>"))),
+      shape);
+    assertEquals(shape, comparison.beforeComparison(comparison.afterRestore(comparison.beforeStore(shape))));
   }
 
   @Test
