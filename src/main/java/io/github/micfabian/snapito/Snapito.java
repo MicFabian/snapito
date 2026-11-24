@@ -1,5 +1,6 @@
 package io.github.micfabian.snapito;
 
+import io.github.micfabian.snapito.comparison.JsonComparison;
 import io.github.micfabian.snapito.environment.ContinuousIntegration;
 import io.github.micfabian.snapito.junit.SnapitoContext;
 import io.github.micfabian.snapito.junit.SnapshotCleanup;
@@ -55,6 +56,14 @@ public final class Snapito {
       assertSnapshot(actual, comparison);
       return null;
     });
+  }
+
+  public static void expectJson(Object actual, Consumer<JsonComparison> configuration) {
+    assertSnapshot(actual, Comparisons.json(configuration));
+  }
+
+  public static void expectJsonNamed(String name, Object actual, Consumer<JsonComparison> configuration) {
+    expectNamed(name, actual, Comparisons.json(configuration));
   }
 
   public static void expectInteractions(Object... mocks) {

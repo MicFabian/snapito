@@ -184,6 +184,25 @@ class SnapitoTest {
   }
 
   @Test
+  void expectJsonAppliesTheInlineConfiguration() {
+    Snapito.expectJson(Map.of("id", 1, "tags", List.of("b", "a")), json -> json
+      .excludingProperties("id")
+      .ignoringArrayOrder());
+    SnapitoTestSupport.enterTest("PaymentServiceTest", "creates a payment");
+
+    Snapito.expectJson(Map.of("id", 2, "tags", List.of("a", "b")), json -> json
+      .excludingProperties("id")
+      .ignoringArrayOrder());
+  }
+
+  @Test
+  void expectJsonNamedWritesANamedBaseline() {
+    Snapito.expectJsonNamed("payload", Map.of("amount", 1), json -> json.excludingProperties("id"));
+
+    assertTrue(Files.exists(snapshotPath("payload.json")));
+  }
+
+  @Test
   void suffixesNamedSnapshotsPerIterationToo() {
     SnapitoTestSupport.enterTest("PaymentServiceTest", "creates a payment", 0, true, Map.of(), List.of());
     Snapito.expectNamed("payload", Map.of("amount", 1));
