@@ -218,6 +218,39 @@ Derive a variant without touching the original:
 var stricter = comparison.with(json -> json.excludingProperties("traceId"));
 ```
 
+### Volatile values, types, excerpts and shapes
+
+```java
+Snapito.expectJson(response, json -> json.maskingVolatile());
+```
+
+`maskingVolatile()` (or `maskingUuids()` / `maskingTimestamps()`) replaces UUIDs and ISO-8601 timestamps with numbered
+placeholders such as `<uuid-1>` and `<timestamp-1>`. The same value always gets the same number, so relationships
+inside the document stay visible. Numbers follow document order with object keys sorted.
+
+```java
+Snapito.expectJson(response, json -> json
+  .asType("$.createdAt", ValueType.TIMESTAMP)
+  .asType("$.items[*].id", ValueType.UUID));
+```
+
+`asType` replaces a value with `<timestamp>`, `<uuid>`, ... only when it really has that type, so a malformed value
+still shows up in the diff.
+
+```java
+Snapito.expectJson(response, json -> json.onlyPaths("$.items[*].name", "$.meta.total"));
+```
+
+`onlyPaths` is the counterpart of `excludingPaths`: only the listed parts are compared and stored. Index positions such
+as `[1]` are rejected, use `[*]`.
+
+```java
+Snapito.expectShape(response);
+```
+
+`expectShape` stores only structure and types (`<string>`, `<number>`, `<boolean>`, `<null>`), with arrays collapsed to
+their distinct element shapes. Useful as a contract test against third-party APIs.
+
 ## SQL snapshots
 
 Record the statements your code sends to the database and review them like any other baseline:
@@ -340,6 +373,15 @@ filter a run (`--tests 'ApiTest.oneMethod'`, `@Disabled`, tag filters), cleanup 
 reason is logged, so a narrow run can never delete baselines belonging to the tests it did not run.
 - `reportMissingSnapito` writes every missing baseline and reports them without failing on mismatches.
 - `indexSnapito` writes the snapshot provenance index.
+- `reviewSnapito` writes `build/reports/snapito/index.html` listing every pending change with its diff, and prints a
+  summary.
+- `acceptSnapito` accepts pending changes selectively instead of updating everything:
+
+```bash
+./gradlew reviewSnapito
+./gradlew acceptSnapito -Psnapito.accept='api/*.json'
+./gradlew acceptSnapito -Psnapito.accept=all
+```
 
 ## Named and data-driven snapshots
 
