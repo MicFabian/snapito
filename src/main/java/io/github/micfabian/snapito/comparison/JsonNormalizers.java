@@ -6,10 +6,15 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class JsonNormalizers {
+  private static final Pattern UUID_VALUE = Pattern.compile(
+    "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
+  private static final Pattern TIMESTAMP_VALUE = Pattern.compile(
+    "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:?\\d{2})?");
   private static final Pattern PATH_TOKEN = Pattern.compile("(?:\\.([^.\\[]+)|\\[(\\d+|\\*)])");
 
   private JsonNormalizers() {
@@ -36,6 +41,146 @@ public final class JsonNormalizers {
     for (String path : paths) {
       remove(root, tokens(path), 0);
     }
+  }
+
+  public static Object retainPaths(Object root, Collection<String> paths) {
+    if (paths.isEmpty()) {
+      return root;
+    }
+    PathTrie trie = new PathTrie();
+    for (String path : paths) {
+      trie.add(tokens(path), 0);
+    }
+    Object pruned = prune(root, trie);
+    return pruned == ABSENT ? new LinkedHashMap<String, Object>() : pruned;
+  }
+
+  private static final Object ABSENT = new Object();
+  private static final java.util.Set<String> SHAPE_MARKERS =
+    java.util.Set.of("<null>", "<boolean>", "<number>", "<string>");
+
+  private static final class PathTrie {
+    private boolean terminal;
+    private final Map<String, PathTrie> children = new LinkedHashMap<>();
+
+    private void add(List<String> tokens, int index) {
+      if (index >= tokens.size()) {
+        terminal = true;
+        return;
+      }
+      children.computeIfAbsent(tokens.get(index), ignored -> new PathTrie()).add(tokens, index + 1);
+    }
+
+    private PathTrie child(String token) {
+      PathTrie exact = children.get(token);
+      return exact != null ? exact : children.get("*");
+    }
+  }
+
+  private static Object prune(Object value, PathTrie trie) {
+    if (trie.terminal) {
+      return value;
+    }
+    if (value instanceof Map<?, ?> map) {
+      Map<String, Object> result = new LinkedHashMap<>();
+      for (Map.Entry<?, ?> entry : map.entrySet()) {
+        PathTrie child = trie.child(String.valueOf(entry.getKey()));
+        if (child == null) {
+          continue;
+        }
+        Object pruned = prune(entry.getValue(), child);
+        if (pruned != ABSENT) {
+          result.put(String.valueOf(entry.getKey()), pruned);
+        }
+      }
+      return result.isEmpty() ? ABSENT : result;
+    }
+    if (value instanceof List<?> list) {
+      List<Object> result = new ArrayList<>();
+      for (int index = 0; index < list.size(); index++) {
+        PathTrie child = trie.child(String.valueOf(index));
+        if (child == null) {
+          continue;
+        }
+        Object pruned = prune(list.get(index), child);
+        if (pruned != ABSENT) {
+          result.add(pruned);
+        }
+      }
+      return result.isEmpty() ? ABSENT : result;
+    }
+    return ABSENT;
+  }
+
+  public static void typePaths(Object root, Map<String, ValueType> rules) {
+    rules.forEach((path, type) -> typeAt(root, tokens(path), 0, type));
+  }
+
+  @SuppressWarnings("unchecked")
+  private static void typeAt(Object current, List<String> tokens, int index, ValueType type) {
+    if (current == null || index >= tokens.size()) {
+      return;
+    }
+    String token = tokens.get(index);
+    boolean last = index == tokens.size() - 1;
+    if (current instanceof Map<?, ?> rawMap) {
+      Map<String, Object> map = (Map<String, Object>) rawMap;
+      for (String key : new ArrayList<>(map.keySet())) {
+        if (!"*".equals(token) && !key.equals(token)) {
+          continue;
+        }
+        if (last) {
+          if (type.accepts(map.get(key))) {
+            map.put(key, type.placeholder());
+          }
+        } else {
+          typeAt(map.get(key), tokens, index + 1, type);
+        }
+      }
+      return;
+    }
+    if (current instanceof List<?> rawList) {
+      List<Object> list = (List<Object>) rawList;
+      for (int position = 0; position < list.size(); position++) {
+        if (!"*".equals(token) && !String.valueOf(position).equals(token)) {
+          continue;
+        }
+        if (last) {
+          if (type.accepts(list.get(position))) {
+            list.set(position, type.placeholder());
+          }
+        } else {
+          typeAt(list.get(position), tokens, index + 1, type);
+        }
+      }
+    }
+  }
+
+  public static Object shapeOf(Object value) {
+    if (value instanceof Map<?, ?> map) {
+      Map<String, Object> shape = new LinkedHashMap<>();
+      map.forEach((key, item) -> shape.put(String.valueOf(key), shapeOf(item)));
+      return shape;
+    }
+    if (value instanceof List<?> list) {
+      Map<String, Object> unique = new java.util.TreeMap<>();
+      for (Object item : list) {
+        Object shape = shapeOf(item);
+        unique.putIfAbsent(canonical(shape), shape);
+      }
+      return new ArrayList<>(unique.values());
+    }
+    if (value == null) {
+      return "<null>";
+    }
+    if (value instanceof Boolean) {
+      return "<boolean>";
+    }
+    if (value instanceof Number) {
+      return "<number>";
+    }
+    String text = value.toString();
+    return SHAPE_MARKERS.contains(text) ? text : "<string>";
   }
 
   public static void sortPaths(Object root, Collection<String> paths) {
@@ -89,6 +234,77 @@ public final class JsonNormalizers {
   }
 
   @SuppressWarnings("unchecked")
+  public static Object maskVolatile(Object value, boolean uuids, boolean timestamps) {
+    if (!uuids && !timestamps) {
+      return value;
+    }
+    VolatileMasker masker = new VolatileMasker(uuids, timestamps);
+    return masker.mask(value);
+  }
+
+  private static final class VolatileMasker {
+    private final boolean uuids;
+    private final boolean timestamps;
+    private final Map<String, Integer> uuidNumbers = new LinkedHashMap<>();
+    private final Map<String, Integer> timestampNumbers = new LinkedHashMap<>();
+
+    private VolatileMasker(boolean uuids, boolean timestamps) {
+      this.uuids = uuids;
+      this.timestamps = timestamps;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Object mask(Object value) {
+      if (value instanceof Map<?, ?> map) {
+        Map<String, Object> target = (Map<String, Object>) map;
+        for (String key : new TreeMap<>(target).keySet()) {
+          target.put(key, mask(target.get(key)));
+        }
+        return target;
+      }
+      if (value instanceof List<?> list) {
+        List<Object> target = (List<Object>) list;
+        for (int index = 0; index < target.size(); index++) {
+          target.set(index, mask(target.get(index)));
+        }
+        return target;
+      }
+      if (value instanceof CharSequence sequence) {
+        String text = sequence.toString();
+        if (uuids) {
+          text = replace(text, UUID_VALUE, uuidNumbers, "uuid", true);
+        }
+        if (timestamps) {
+          text = replace(text, TIMESTAMP_VALUE, timestampNumbers, "timestamp", false);
+        }
+        return text;
+      }
+      return value;
+    }
+
+    private static String replace(
+        String text,
+        Pattern pattern,
+        Map<String, Integer> numbers,
+        String label,
+        boolean caseInsensitive) {
+      Matcher matcher = pattern.matcher(text);
+      if (!matcher.find()) {
+        return text;
+      }
+      StringBuilder result = new StringBuilder();
+      int last = 0;
+      do {
+        String found = matcher.group();
+        String key = caseInsensitive ? found.toLowerCase(java.util.Locale.ROOT) : found;
+        int number = numbers.computeIfAbsent(key, ignored -> numbers.size() + 1);
+        result.append(text, last, matcher.start()).append('<').append(label).append('-').append(number).append('>');
+        last = matcher.end();
+      } while (matcher.find());
+      return result.append(text, last, text.length()).toString();
+    }
+  }
+
   public static Object replaceRegex(Object value, Map<Pattern, String> replacements) {
     if (replacements.isEmpty()) {
       return value;

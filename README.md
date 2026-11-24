@@ -218,6 +218,39 @@ Derive a variant without touching the original:
 var stricter = comparison.with(json -> json.excludingProperties("traceId"));
 ```
 
+### Volatile values, types, excerpts and shapes
+
+```java
+Snapito.expectJson(response, json -> json.maskingVolatile());
+```
+
+`maskingVolatile()` (or `maskingUuids()` / `maskingTimestamps()`) replaces UUIDs and ISO-8601 timestamps with numbered
+placeholders such as `<uuid-1>` and `<timestamp-1>`. The same value always gets the same number, so relationships
+inside the document stay visible. Numbers follow document order with object keys sorted.
+
+```java
+Snapito.expectJson(response, json -> json
+  .asType("$.createdAt", ValueType.TIMESTAMP)
+  .asType("$.items[*].id", ValueType.UUID));
+```
+
+`asType` replaces a value with `<timestamp>`, `<uuid>`, ... only when it really has that type, so a malformed value
+still shows up in the diff.
+
+```java
+Snapito.expectJson(response, json -> json.onlyPaths("$.items[*].name", "$.meta.total"));
+```
+
+`onlyPaths` is the counterpart of `excludingPaths`: only the listed parts are compared and stored. Index positions such
+as `[1]` are rejected, use `[*]`.
+
+```java
+Snapito.expectShape(response);
+```
+
+`expectShape` stores only structure and types (`<string>`, `<number>`, `<boolean>`, `<null>`), with arrays collapsed to
+their distinct element shapes. Useful as a contract test against third-party APIs.
+
 ## PNG comparison and visual diffs
 
 ```java
