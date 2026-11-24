@@ -269,6 +269,22 @@ size for `executeBatch`. A new N+1 query shows up as extra lines in the diff. Us
 to keep volatile parameter values out of the file, or combine it with JSON masking by passing `recorder.statements()` to
 `Snapito.expectJson(...)`.
 
+## Spring MockMvc
+
+With `spring-test` on your classpath, snapshot a whole MockMvc response (status, selected headers, body) in one file:
+
+```java
+MvcResult result = mockMvc.perform(post("/orders").content(body)).andReturn();
+
+MvcSnapshots.expectResponse(result);
+MvcSnapshots.expectResponse(result, json -> json.maskingVolatile().excludingProperties("traceId"));
+MvcSnapshots.expectResponse(result, List.of("Location", "X-Request-Id"), json -> json.maskingVolatile());
+```
+
+JSON bodies are parsed and compared as JSON, other bodies as text. By default only `Content-Type`, `Location`,
+`Content-Disposition` and `Cache-Control` are recorded, so volatile headers such as `Date` or `Set-Cookie` never reach
+the baseline. Spring is an optional dependency: Snapito does not pull it in.
+
 ## PNG comparison and visual diffs
 
 ```java
