@@ -20,6 +20,9 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
 public final class Xml {
+  private static final ThreadLocal<DocumentBuilder> BUILDERS = new ThreadLocal<>();
+  private static final ThreadLocal<Transformer> TRANSFORMERS = new ThreadLocal<>();
+
   private Xml() {
   }
 
@@ -52,13 +55,7 @@ public final class Xml {
 
   public static String serialize(Node node) {
     try {
-      TransformerFactory factory = TransformerFactory.newInstance();
-      factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
-      factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
-      Transformer transformer = factory.newTransformer();
-      transformer.setOutputProperty(OutputKeys.INDENT, "yes");
-      transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
-      transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2");
+      Transformer transformer = transformer();
       StringWriter writer = new StringWriter();
       transformer.transform(new DOMSource(node), new StreamResult(writer));
       return writer.toString().trim();
@@ -67,7 +64,27 @@ public final class Xml {
     }
   }
 
+  private static Transformer transformer() throws TransformerException {
+    Transformer cached = TRANSFORMERS.get();
+    if (cached != null) {
+      return cached;
+    }
+    TransformerFactory factory = TransformerFactory.newInstance();
+    factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+    factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
+    Transformer transformer = factory.newTransformer();
+    transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+    transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
+    transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2");
+    TRANSFORMERS.set(transformer);
+    return transformer;
+  }
+
   private static DocumentBuilder builder() throws ParserConfigurationException {
+    DocumentBuilder cached = BUILDERS.get();
+    if (cached != null) {
+      return cached;
+    }
     DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
     factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
     factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
@@ -76,6 +93,7 @@ public final class Xml {
     factory.setCoalescing(true);
     DocumentBuilder builder = factory.newDocumentBuilder();
     builder.setErrorHandler(null);
+    BUILDERS.set(builder);
     return builder;
   }
 
