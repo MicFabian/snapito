@@ -31,5 +31,7 @@ class SnapitoPluginTest {
     assertEquals("true", cleanup.getSystemProperties().get("snapito.snapshot.clean"));
     assertEquals("true", reportMissing.getSystemProperties().get("snapito.reportMissing"));
     assertEquals("true", index.getSystemProperties().get("snapito.writeIndex"));
+    assertNotNull(project.getTasks().getByName("reviewSnapito"));
+    assertNotNull(project.getTasks().getByName("acceptSnapito"));
   }
 }
