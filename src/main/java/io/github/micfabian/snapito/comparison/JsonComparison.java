@@ -25,6 +25,8 @@ public class JsonComparison implements AdvancedComparison {
   private final Map<Pattern, String> regexReplacements = new LinkedHashMap<>();
   private BigDecimal numericTolerance = BigDecimal.ZERO;
   private boolean ignoreArrayOrder = false;
+  private boolean maskUuids = false;
+  private boolean maskTimestamps = false;
   private boolean shared = false;
 
   public JsonComparison() {
@@ -97,6 +99,22 @@ public class JsonComparison implements AdvancedComparison {
     return this;
   }
 
+  public JsonComparison maskingUuids() {
+    checkMutable();
+    maskUuids = true;
+    return this;
+  }
+
+  public JsonComparison maskingTimestamps() {
+    checkMutable();
+    maskTimestamps = true;
+    return this;
+  }
+
+  public JsonComparison maskingVolatile() {
+    return maskingUuids().maskingTimestamps();
+  }
+
   public JsonComparison sortedBy(String path, String field) {
     checkMutable();
     sortedPaths.put(path, field);
@@ -134,6 +152,8 @@ public class JsonComparison implements AdvancedComparison {
     copy.regexReplacements.putAll(regexReplacements);
     copy.numericTolerance = numericTolerance;
     copy.ignoreArrayOrder = ignoreArrayOrder;
+    copy.maskUuids = maskUuids;
+    copy.maskTimestamps = maskTimestamps;
   }
 
   public JsonComparison with(Consumer<JsonComparison> configuration) {
@@ -166,6 +186,7 @@ public class JsonComparison implements AdvancedComparison {
     Object normalized = JsonNormalizers.copy(plain);
     removeExcludedProperties(normalized);
     JsonNormalizers.removePaths(normalized, excludedPaths);
+    normalized = JsonNormalizers.maskVolatile(normalized, maskUuids, maskTimestamps);
     if (ignoreArrayOrder) {
       JsonNormalizers.sortAllLists(normalized);
     }

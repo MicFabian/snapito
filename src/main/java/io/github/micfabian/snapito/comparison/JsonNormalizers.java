@@ -6,10 +6,15 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class JsonNormalizers {
+  private static final Pattern UUID_VALUE = Pattern.compile(
+    "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
+  private static final Pattern TIMESTAMP_VALUE = Pattern.compile(
+    "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:?\\d{2})?");
   private static final Pattern PATH_TOKEN = Pattern.compile("(?:\\.([^.\\[]+)|\\[(\\d+|\\*)])");
 
   private JsonNormalizers() {
@@ -89,6 +94,77 @@ public final class JsonNormalizers {
   }
 
   @SuppressWarnings("unchecked")
+  public static Object maskVolatile(Object value, boolean uuids, boolean timestamps) {
+    if (!uuids && !timestamps) {
+      return value;
+    }
+    VolatileMasker masker = new VolatileMasker(uuids, timestamps);
+    return masker.mask(value);
+  }
+
+  private static final class VolatileMasker {
+    private final boolean uuids;
+    private final boolean timestamps;
+    private final Map<String, Integer> uuidNumbers = new LinkedHashMap<>();
+    private final Map<String, Integer> timestampNumbers = new LinkedHashMap<>();
+
+    private VolatileMasker(boolean uuids, boolean timestamps) {
+      this.uuids = uuids;
+      this.timestamps = timestamps;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Object mask(Object value) {
+      if (value instanceof Map<?, ?> map) {
+        Map<String, Object> target = (Map<String, Object>) map;
+        for (String key : new TreeMap<>(target).keySet()) {
+          target.put(key, mask(target.get(key)));
+        }
+        return target;
+      }
+      if (value instanceof List<?> list) {
+        List<Object> target = (List<Object>) list;
+        for (int index = 0; index < target.size(); index++) {
+          target.set(index, mask(target.get(index)));
+        }
+        return target;
+      }
+      if (value instanceof CharSequence sequence) {
+        String text = sequence.toString();
+        if (uuids) {
+          text = replace(text, UUID_VALUE, uuidNumbers, "uuid", true);
+        }
+        if (timestamps) {
+          text = replace(text, TIMESTAMP_VALUE, timestampNumbers, "timestamp", false);
+        }
+        return text;
+      }
+      return value;
+    }
+
+    private static String replace(
+        String text,
+        Pattern pattern,
+        Map<String, Integer> numbers,
+        String label,
+        boolean caseInsensitive) {
+      Matcher matcher = pattern.matcher(text);
+      if (!matcher.find()) {
+        return text;
+      }
+      StringBuilder result = new StringBuilder();
+      int last = 0;
+      do {
+        String found = matcher.group();
+        String key = caseInsensitive ? found.toLowerCase(java.util.Locale.ROOT) : found;
+        int number = numbers.computeIfAbsent(key, ignored -> numbers.size() + 1);
+        result.append(text, last, matcher.start()).append('<').append(label).append('-').append(number).append('>');
+        last = matcher.end();
+      } while (matcher.find());
+      return result.append(text, last, text.length()).toString();
+    }
+  }
+
   public static Object replaceRegex(Object value, Map<Pattern, String> replacements) {
     if (replacements.isEmpty()) {
       return value;

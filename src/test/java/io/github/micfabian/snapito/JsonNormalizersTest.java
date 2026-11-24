@@ -115,6 +115,54 @@ class JsonNormalizersTest {
   }
 
   @Test
+  void maskingVolatileNumbersUuidsAndTimestampsInDocumentOrder() {
+    JsonComparison comparison = JsonComparison.configured(json -> json.maskingVolatile());
+    Object masked = comparison.beforeComparison(
+      "{\"id\":\"3F2504E0-4F89-11D3-9A0C-0305E82C3301\",\"ref\":\"/orders/3f2504e0-4f89-11d3-9a0c-0305e82c3301/items\","
+        + "\"other\":\"aaaaaaaa-4f89-11d3-9a0c-0305e82c3301\",\"at\":\"2026-11-24T10:15:30.123Z\",\"later\":\"2026-11-25T10:15:30+01:00\"}");
+
+    assertEquals(
+      Map.of(
+        "id", "<uuid-1>",
+        "ref", "/orders/<uuid-1>/items",
+        "other", "<uuid-2>",
+        "at", "<timestamp-1>",
+        "later", "<timestamp-2>"),
+      masked);
+  }
+
+  @Test
+  void maskedDocumentsFromDifferentRunsMatchButChangedRelationshipsDoNot() {
+    JsonComparison comparison = JsonComparison.configured(json -> json.maskingVolatile());
+    Object first = comparison.beforeComparison(
+      "{\"a\":\"11111111-1111-1111-1111-111111111111\",\"b\":\"11111111-1111-1111-1111-111111111111\",\"t\":\"2026-01-01T00:00:00Z\"}");
+    Object second = comparison.beforeComparison(
+      "{\"t\":\"2027-05-05T05:05:05Z\",\"b\":\"22222222-2222-2222-2222-222222222222\",\"a\":\"22222222-2222-2222-2222-222222222222\"}");
+    Object different = comparison.beforeComparison(
+      "{\"a\":\"33333333-3333-3333-3333-333333333333\",\"b\":\"44444444-4444-4444-4444-444444444444\",\"t\":\"2026-01-01T00:00:00Z\"}");
+
+    assertTrue(comparison.matches(first, second));
+    assertFalse(comparison.matches(first, different));
+  }
+
+  @Test
+  void maskingIsIdempotentForAlreadyStoredBaselines() {
+    JsonComparison comparison = JsonComparison.configured(json -> json.maskingVolatile());
+    Object masked = comparison.beforeComparison("{\"id\":\"11111111-1111-1111-1111-111111111111\"}");
+    Object restored = comparison.beforeComparison(comparison.afterRestore(comparison.beforeStore(masked)));
+
+    assertEquals(masked, restored);
+  }
+
+  @Test
+  void maskingCanBeLimitedToUuidsOrTimestamps() {
+    Object onlyUuids = JsonComparison.configured(json -> json.maskingUuids()).beforeComparison(
+      "{\"id\":\"11111111-1111-1111-1111-111111111111\",\"at\":\"2026-01-01T00:00:00Z\"}");
+
+    assertEquals(Map.of("id", "<uuid-1>", "at", "2026-01-01T00:00:00Z"), onlyUuids);
+  }
+
+  @Test
   void listOrderStillMattersByDefault() {
     JsonComparison comparison = new JsonComparison();
 
