@@ -532,11 +532,17 @@ public final class Snapito {
     return candidate.matches(regex.toString());
   }
 
+  private static final Pattern UPPER_CASE = Pattern.compile("([A-Z])");
+  private static final Pattern LOWER_UPPER = Pattern.compile("([a-z0-9])([A-Z])");
+  private static final Pattern ACRONYM = Pattern.compile("([A-Z]+)([A-Z][a-z])");
+  private static final Pattern NON_ALPHANUMERIC = Pattern.compile("[^a-z0-9]+");
+  private static final Pattern EDGE_DASHES = Pattern.compile("^-+|-+$");
+
   private static String toKebabCase(String className) {
     if (className == null || className.isEmpty()) {
       return "test";
     }
-    String lower = className.replaceAll("([A-Z])", "-$1").toLowerCase(Locale.ENGLISH);
+    String lower = UPPER_CASE.matcher(className).replaceAll("-$1").toLowerCase(Locale.ENGLISH);
     return lower.startsWith("-") ? lower.substring(1) : lower;
   }
 
@@ -544,11 +550,9 @@ public final class Snapito {
     if (name == null || name.isEmpty()) {
       return "";
     }
-    return name.replaceAll("([a-z0-9])([A-Z])", "$1-$2")
-      .replaceAll("([A-Z]+)([A-Z][a-z])", "$1-$2")
-      .toLowerCase(Locale.ENGLISH)
-      .replaceAll("[^a-z0-9]+", "-")
-      .replaceAll("^-+|-+$", "");
+    String spaced = ACRONYM.matcher(LOWER_UPPER.matcher(name).replaceAll("$1-$2")).replaceAll("$1-$2");
+    String dashed = NON_ALPHANUMERIC.matcher(spaced.toLowerCase(Locale.ENGLISH)).replaceAll("-");
+    return EDGE_DASHES.matcher(dashed).replaceAll("");
   }
 
   private static <T> void restore(ThreadLocal<T> holder, T previous) {

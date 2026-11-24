@@ -3,8 +3,11 @@ package io.github.micfabian.snapito.comparison;
 import io.github.micfabian.snapito.Comparison;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 public class TextComparison implements Comparison {
+  private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+
   private boolean ignoreWhitespace = true;
   private boolean ignoreCase = false;
 
@@ -35,7 +38,7 @@ public class TextComparison implements Comparison {
   public Object beforeComparison(Object input) {
     String text = String.valueOf(input);
     if (ignoreWhitespace) {
-      text = text.replaceAll("\\s+", "");
+      text = WHITESPACE.matcher(text).replaceAll("");
     }
     if (ignoreCase) {
       text = text.toLowerCase(Locale.ROOT);
