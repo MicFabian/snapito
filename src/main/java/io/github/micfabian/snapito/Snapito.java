@@ -6,6 +6,7 @@ import io.github.micfabian.snapito.junit.SnapitoContext;
 import io.github.micfabian.snapito.junit.SnapshotCleanup;
 import io.github.micfabian.snapito.mockito.InteractionComparison;
 import io.github.micfabian.snapito.mockito.Interactions;
+import io.github.micfabian.snapito.sql.SqlRecorder;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
@@ -64,6 +65,22 @@ public final class Snapito {
 
   public static void expectJsonNamed(String name, Object actual, Consumer<JsonComparison> configuration) {
     expectNamed(name, actual, Comparisons.json(configuration));
+  }
+
+  public static void expectQueries(SqlRecorder recorder) {
+    assertSnapshot(recorder.statements(), Comparisons.JSON);
+  }
+
+  public static void expectQueriesNamed(String name, SqlRecorder recorder) {
+    expectNamed(name, recorder.statements(), Comparisons.JSON);
+  }
+
+  public static void expectShape(Object actual) {
+    expectJson(actual, json -> json.shapeOnly());
+  }
+
+  public static void expectShapeNamed(String name, Object actual) {
+    expectJsonNamed(name, actual, json -> json.shapeOnly());
   }
 
   public static void expectInteractions(Object... mocks) {

@@ -25,6 +25,11 @@ public class JsonComparison implements AdvancedComparison {
   private final Map<Pattern, String> regexReplacements = new LinkedHashMap<>();
   private BigDecimal numericTolerance = BigDecimal.ZERO;
   private boolean ignoreArrayOrder = false;
+  private final List<String> onlyPaths = new ArrayList<>();
+  private final Map<String, ValueType> typedPaths = new LinkedHashMap<>();
+  private boolean shapeOnly = false;
+  private boolean maskUuids = false;
+  private boolean maskTimestamps = false;
   private boolean shared = false;
 
   public JsonComparison() {
@@ -97,6 +102,48 @@ public class JsonComparison implements AdvancedComparison {
     return this;
   }
 
+  public JsonComparison onlyPaths(String... paths) {
+    checkMutable();
+    for (String path : paths) {
+      for (String token : JsonNormalizers.tokens(path)) {
+        if (!token.isEmpty() && token.chars().allMatch(Character::isDigit)) {
+          throw new IllegalArgumentException(
+            "onlyPaths does not support index positions, use [*] instead: '" + path + "'");
+        }
+      }
+    }
+    onlyPaths.addAll(List.of(paths));
+    return this;
+  }
+
+  public JsonComparison asType(String path, ValueType type) {
+    checkMutable();
+    typedPaths.put(path, type);
+    return this;
+  }
+
+  public JsonComparison shapeOnly() {
+    checkMutable();
+    shapeOnly = true;
+    return this;
+  }
+
+  public JsonComparison maskingUuids() {
+    checkMutable();
+    maskUuids = true;
+    return this;
+  }
+
+  public JsonComparison maskingTimestamps() {
+    checkMutable();
+    maskTimestamps = true;
+    return this;
+  }
+
+  public JsonComparison maskingVolatile() {
+    return maskingUuids().maskingTimestamps();
+  }
+
   public JsonComparison sortedBy(String path, String field) {
     checkMutable();
     sortedPaths.put(path, field);
@@ -134,6 +181,11 @@ public class JsonComparison implements AdvancedComparison {
     copy.regexReplacements.putAll(regexReplacements);
     copy.numericTolerance = numericTolerance;
     copy.ignoreArrayOrder = ignoreArrayOrder;
+    copy.onlyPaths.addAll(onlyPaths);
+    copy.typedPaths.putAll(typedPaths);
+    copy.shapeOnly = shapeOnly;
+    copy.maskUuids = maskUuids;
+    copy.maskTimestamps = maskTimestamps;
   }
 
   public JsonComparison with(Consumer<JsonComparison> configuration) {
@@ -164,14 +216,18 @@ public class JsonComparison implements AdvancedComparison {
   private Object normalize(Object input) {
     Object plain = toPlain(input);
     Object normalized = JsonNormalizers.copy(plain);
+    normalized = JsonNormalizers.retainPaths(normalized, onlyPaths);
     removeExcludedProperties(normalized);
     JsonNormalizers.removePaths(normalized, excludedPaths);
+    normalized = JsonNormalizers.maskVolatile(normalized, maskUuids, maskTimestamps);
     if (ignoreArrayOrder) {
       JsonNormalizers.sortAllLists(normalized);
     }
+    JsonNormalizers.typePaths(normalized, typedPaths);
     JsonNormalizers.sortPaths(normalized, unorderedPaths);
     JsonNormalizers.sortPathsBy(normalized, sortedPaths);
-    return JsonNormalizers.replaceRegex(normalized, regexReplacements);
+    Object replaced = JsonNormalizers.replaceRegex(normalized, regexReplacements);
+    return shapeOnly ? JsonNormalizers.shapeOf(replaced) : replaced;
   }
 
   private Object toPlain(Object input) {

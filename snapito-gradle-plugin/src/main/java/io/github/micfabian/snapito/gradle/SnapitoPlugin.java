@@ -30,6 +30,45 @@ public final class SnapitoPlugin implements Plugin<Project> {
       registerTestTask(project, test, "indexSnapito",
         "Runs snapshot tests and writes the snapshot provenance index",
         Map.of("snapito.snapshot.update", "false", "snapito.writeIndex", "true"));
+      registerReviewTasks(project);
+    });
+  }
+
+  private static void registerReviewTasks(Project project) {
+    Object configured = project.findProperty("snapito.snapshot.dir");
+    java.io.File root = project.file(configured != null ? configured.toString() : "src/test/resources/snapshots");
+    project.getTasks().register("reviewSnapito", task -> {
+      task.setGroup("verification");
+      task.setDescription("Writes an HTML report of pending snapshot changes to build/reports/snapito/index.html");
+      java.io.File report = new java.io.File(project.getLayout().getBuildDirectory().get().getAsFile(),
+        "reports/snapito/index.html");
+      task.getOutputs().file(report);
+      task.getOutputs().upToDateWhen(ignored -> false);
+      task.doLast(ignored -> {
+        java.util.List<SnapshotReview.Pending> pending = SnapshotReview.scan(root.toPath());
+        try {
+          java.nio.file.Files.createDirectories(report.toPath().getParent());
+          java.nio.file.Files.writeString(report.toPath(), SnapshotReview.renderHtml(pending));
+        } catch (java.io.IOException e) {
+          throw new java.io.UncheckedIOException(e);
+        }
+        project.getLogger().lifecycle("{} pending snapshot change(s), report: {}", pending.size(), report);
+        pending.forEach(item -> project.getLogger().lifecycle("  {} {}", item.created() ? "new    " : "changed", item.name()));
+      });
+    });
+    project.getTasks().register("acceptSnapito", task -> {
+      task.setGroup("verification");
+      task.setDescription("Accepts pending snapshot changes selected with -Psnapito.accept=<glob|all>");
+      task.getOutputs().upToDateWhen(ignored -> false);
+      task.doLast(ignored -> {
+        Object selector = project.findProperty("snapito.accept");
+        if (selector == null) {
+          throw new org.gradle.api.GradleException(
+            "Select what to accept with -Psnapito.accept=<glob> or -Psnapito.accept=all (see reviewSnapito)");
+        }
+        int accepted = SnapshotReview.accept(root.toPath(), selector.toString());
+        project.getLogger().lifecycle("Accepted {} snapshot change(s)", accepted);
+      });
     });
   }
 
